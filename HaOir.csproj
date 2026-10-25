@@ -7,11 +7,14 @@
     <Nullable>enable</Nullable>
     <ApplicationIcon />
     <StartupObject>HaOir.App</StartupObject>
+    <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
   </PropertyGroup>
 
   <ItemGroup>
     <PackageReference Include="CmlLib.Core" Version="4.0.6" />
     <PackageReference Include="CmlLib.Core.Auth.Microsoft" Version="3.2.2" />
+    <PackageReference Include="CmlLib.Core.Installer.Forge" Version="4.0.1" />
+    <PackageReference Include="CmlLib.Core.Installer.Fabric" Version="4.0.0" />
   </ItemGroup>
 
   <ItemGroup>

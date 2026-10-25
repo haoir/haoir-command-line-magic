@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Generic;
 using System.Net.Http;
 using System.Threading.Tasks;
 using System.Windows;
@@ -8,7 +7,8 @@ using CmlLib.Core;
 using CmlLib.Core.Auth;
 using CmlLib.Core.Auth.Microsoft;
 using CmlLib.Core.ProcessBuilder;
-using CmlLib.Core.Version;
+using CmlLib.Core.Installer.Forge;
+using CmlLib.Core.Installer.Fabric;
 
 namespace HaOir
 {
@@ -30,7 +30,6 @@ namespace HaOir
 
         private void MainWindow_Loaded(object sender, RoutedEventArgs e)
         {
-            // 启动背景动画
             var storyboard = (System.Windows.Media.Animation.Storyboard)Resources["BackgroundAnimation"];
             storyboard.Begin();
         }
@@ -41,52 +40,39 @@ namespace HaOir
             {
                 var path = new MinecraftPath();
                 launcher = new MinecraftLauncher(path);
-                
-                // 默认加载原版版本列表
                 await LoadVanillaVersions();
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"初始化启动器失败：{ex.Message}", "错误", MessageBoxButton.OK, MessageBoxImage.Error);
+                MessageBox.Show($"初始化失败：{ex.Message}");
             }
         }
 
         private async void CategoryList_SelectionChanged(object sender, System.Windows.Controls.SelectionChangedEventArgs e)
         {
             if (CategoryList.SelectedItem == null) return;
-
             var category = (CategoryList.SelectedItem as System.Windows.Controls.ListBoxItem)?.Content?.ToString();
             
             try
             {
                 switch (category)
                 {
-                    case "原版":
-                        await LoadVanillaVersions();
-                        break;
-                    case "Forge":
-                        await LoadForgeVersions();
-                        break;
-                    case "Fabric":
-                        await LoadFabricVersions();
-                        break;
-                    case "NeoForge":
-                        await LoadNeoForgeVersions();
-                        break;
-                    case "服务端":
-                        await LoadServerVersions();
-                        break;
+                    case "原版": await LoadVanillaVersions(); break;
+                    case "Forge": await LoadForgeVersions(); break;
+                    case "Fabric": await LoadFabricVersions(); break;
+                    case "NeoForge": await LoadNeoForgeVersions(); break;
+                    case "服务端": await LoadServerVersions(); break;
                 }
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"加载版本列表失败：{ex.Message}", "错误", MessageBoxButton.OK, MessageBoxImage.Error);
+                MessageBox.Show($"加载列表失败：{ex.Message}");
             }
         }
 
         private async Task LoadVanillaVersions()
         {
-            var versions = await launcher.GetVersionMetadatas();
+            var versions = await launcher.GetAllVersionsAsync();
             VersionList.Items.Clear();
             foreach (var version in versions)
             {
@@ -96,51 +82,65 @@ namespace HaOir
 
         private async Task LoadForgeVersions()
         {
-            var forgeInstaller = new ForgeInstaller();
-            var versions = await forgeInstaller.GetForgeVersions();
-            VersionList.Items.Clear();
-            foreach (var version in versions)
+            try
             {
-                VersionList.Items.Add(new System.Windows.Controls.ListBoxItem { Content = version });
+                var forgeInstaller = new ForgeInstaller(launcher);
+                var versions = await forgeInstaller.GetForgeVersions("1.20.1");
+                VersionList.Items.Clear();
+                foreach (var version in versions)
+                {
+                    VersionList.Items.Add(new System.Windows.Controls.ListBoxItem { Content = version.VersionName });
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"获取Forge失败：{ex.Message}");
             }
         }
 
         private async Task LoadFabricVersions()
         {
-            var fabricLoader = new FabricLoader();
-            var versions = await fabricLoader.GetBuilds();
-            VersionList.Items.Clear();
-            foreach (var version in versions)
+            try
             {
-                VersionList.Items.Add(new System.Windows.Controls.ListBoxItem { Content = $"Fabric-{version.Version}" });
+                var fabricInstaller = new FabricInstaller(launcher);
+                var versions = await fabricInstaller.GetLoadersAsync();
+                VersionList.Items.Clear();
+                foreach (var version in versions)
+                {
+                    VersionList.Items.Add(new System.Windows.Controls.ListBoxItem { Content = version.Version });
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"获取Fabric失败：{ex.Message}");
             }
         }
 
         private async Task LoadNeoForgeVersions()
         {
-            // NeoForge 版本列表（示例，实际需从 API 获取）
             VersionList.Items.Clear();
-            var neoForgeVersions = new[] { "1.20.4-49.0.0", "1.20.1-47.1.0", "1.19.4-45.0.0" };
+            var neoForgeVersions = new[] { "1.20.4-49.0.0", "1.20.1-47.1.0" };
             foreach (var version in neoForgeVersions)
             {
                 VersionList.Items.Add(new System.Windows.Controls.ListBoxItem { Content = version });
             }
+            await Task.CompletedTask;
         }
 
         private async Task LoadServerVersions()
         {
             VersionList.Items.Clear();
-            var serverVersions = new[] { "server-1.21.1", "server-1.20.4", "server-1.19.4" };
+            var serverVersions = new[] { "server-1.21.1", "server-1.20.4" };
             foreach (var version in serverVersions)
             {
                 VersionList.Items.Add(new System.Windows.Controls.ListBoxItem { Content = version });
             }
+            await Task.CompletedTask;
         }
 
         private void VersionList_SelectionChanged(object sender, System.Windows.Controls.SelectionChangedEventArgs e)
         {
             if (VersionList.SelectedItem == null) return;
-
             selectedVersion = (VersionList.SelectedItem as System.Windows.Controls.ListBoxItem)?.Content?.ToString();
             if (!string.IsNullOrEmpty(selectedVersion))
             {
@@ -167,7 +167,6 @@ namespace HaOir
         private void ModeToggleBtn_Click(object sender, RoutedEventArgs e)
         {
             isPremiumMode = !isPremiumMode;
-            
             if (isPremiumMode)
             {
                 ModeToggleBtn.Content = "离线";
@@ -190,19 +189,16 @@ namespace HaOir
             {
                 if (selectedVersion.StartsWith("server-"))
                 {
-                    // 服务端模式：下载 server.jar
                     await DownloadServerJar(selectedVersion);
                     return;
                 }
 
                 if (isPremiumMode)
                 {
-                    // 正版登录
                     await LoginWithMicrosoft();
                 }
                 else
                 {
-                    // 离线登录
                     var username = InputNameBox.Text.Trim();
                     if (string.IsNullOrEmpty(username))
                     {
@@ -237,13 +233,13 @@ namespace HaOir
 
         private async Task LaunchMinecraft()
         {
-            var processBuilder = new MProcessBuilder(launcher)
+            var processBuilder = new MProcessBuilder()
             {
-                VersionName = selectedVersion,
+                Version = selectedVersion,
                 Session = session
             };
 
-            var process = await processBuilder.BuildAsync();
+            var process = await processBuilder.BuildAsync(launcher);
             process.Start();
             ModalOverlay.Visibility = Visibility.Collapsed;
             MessageBox.Show($"Minecraft {selectedVersion} 已启动", "成功", MessageBoxButton.OK, MessageBoxImage.Information);
