@@ -102,8 +102,9 @@ namespace HaOir
         {
             try
             {
-                var fabricInstaller = new FabricInstaller(launcher);
-                var versions = await fabricInstaller.GetLoadersAsync();
+                // 正确调用方式：传入 HttpClient，然后获取 Loader 列表
+                var fabricInstaller = new FabricInstaller(httpClient);
+                var versions = await fabricInstaller.GetLoaders("1.20.1");
                 VersionList.Items.Clear();
                 foreach (var version in versions)
                 {
