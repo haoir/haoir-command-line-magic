@@ -8,7 +8,7 @@ using CmlLib.Core.Auth;
 using CmlLib.Core.Auth.Microsoft;
 using CmlLib.Core.ProcessBuilder;
 using CmlLib.Core.Installer.Forge;
-using CmlLib.Core.Installer.Fabric;
+using CmlLib.Core.Installers;
 
 namespace HaOir
 {
