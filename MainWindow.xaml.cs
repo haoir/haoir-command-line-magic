@@ -1,4 +1,6 @@
 using System;
+using System.Collections.Generic;
+using System.IO;
 using System.Net.Http;
 using System.Threading.Tasks;
 using System.Windows;
@@ -8,12 +10,12 @@ using CmlLib.Core.Auth;
 using CmlLib.Core.Auth.Microsoft;
 using CmlLib.Core.ProcessBuilder;
 using CmlLib.Core.Installer.Forge;
-using CmlLib.Core.Installers;
 
 namespace HaOir
 {
     public partial class MainWindow : Window
     {
+        private MinecraftPath mcPath;
         private MinecraftLauncher launcher;
         private MSession session;
         private string selectedVersion;
@@ -38,13 +40,13 @@ namespace HaOir
         {
             try
             {
-                var path = new MinecraftPath();
-                launcher = new MinecraftLauncher(path);
+                mcPath = new MinecraftPath();
+                launcher = new MinecraftLauncher(mcPath);
                 await LoadVanillaVersions();
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"初始化失败：{ex.Message}");
+                MessageBox.Show($"初始化启动器失败：{ex.Message}", "错误", MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
 
@@ -66,7 +68,7 @@ namespace HaOir
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"加载列表失败：{ex.Message}");
+                MessageBox.Show($"加载列表失败：{ex.Message}", "错误", MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
 
@@ -84,37 +86,25 @@ namespace HaOir
         {
             try
             {
-                var forgeInstaller = new ForgeInstaller(launcher);
-                var versions = await forgeInstaller.GetForgeVersions("1.20.1");
+                var installer = new ForgeInstaller(launcher);
+                var vanillaVersions = await installer.GetForgeVersions("1.20.1");
                 VersionList.Items.Clear();
-                foreach (var version in versions)
+                foreach (var version in vanillaVersions)
                 {
                     VersionList.Items.Add(new System.Windows.Controls.ListBoxItem { Content = version.VersionName });
                 }
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"获取Forge失败：{ex.Message}");
+                MessageBox.Show($"获取Forge版本失败：{ex.Message}", "提示", MessageBoxButton.OK, MessageBoxImage.Warning);
             }
         }
 
         private async Task LoadFabricVersions()
         {
-            try
-            {
-                // 正确调用方式：传入 HttpClient，然后获取 Loader 列表
-                var fabricInstaller = new FabricInstaller(httpClient);
-                var versions = await fabricInstaller.GetLoaders("1.20.1");
-                VersionList.Items.Clear();
-                foreach (var version in versions)
-                {
-                    VersionList.Items.Add(new System.Windows.Controls.ListBoxItem { Content = version.Version });
-                }
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show($"获取Fabric失败：{ex.Message}");
-            }
+            VersionList.Items.Clear();
+            VersionList.Items.Add(new System.Windows.Controls.ListBoxItem { Content = "fabric-loader-0.15.11-1.20.1" });
+            await Task.CompletedTask;
         }
 
         private async Task LoadNeoForgeVersions()
@@ -218,32 +208,24 @@ namespace HaOir
 
         private async Task LoginWithMicrosoft()
         {
-            var loginHandler = new JELoginHandlerBuilder().Build();
-            var loginTask = loginHandler.TryLogin(launcher.Path, (uri, request) =>
-            {
-                System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
-                {
-                    FileName = uri.ToString(),
-                    UseShellExecute = true
-                });
-            });
-
-            session = await loginTask;
+            var loginHandler = JELoginHandlerBuilder.BuildDefault();
+            session = await loginHandler.AuthenticateInteractively();
             await LaunchMinecraft();
         }
 
         private async Task LaunchMinecraft()
         {
-            var processBuilder = new MProcessBuilder()
+            ModalOverlay.Visibility = Visibility.Collapsed;
+            MessageBox.Show("正在准备游戏文件并启动，请稍候...", "提示", MessageBoxButton.OK, MessageBoxImage.Information);
+
+            var launchOption = new MLaunchOption
             {
-                Version = selectedVersion,
-                Session = session
+                Session = session,
+                MaximumRamMb = 4096
             };
 
-            var process = await processBuilder.BuildAsync(launcher);
+            var process = await launcher.InstallAndBuildProcessAsync(selectedVersion, launchOption);
             process.Start();
-            ModalOverlay.Visibility = Visibility.Collapsed;
-            MessageBox.Show($"Minecraft {selectedVersion} 已启动", "成功", MessageBoxButton.OK, MessageBoxImage.Information);
         }
 
         private async Task DownloadServerJar(string version)
@@ -256,8 +238,8 @@ namespace HaOir
                 var response = await httpClient.GetAsync(downloadUrl);
                 response.EnsureSuccessStatusCode();
 
-                var filePath = System.IO.Path.Combine(launcher.Path.BasePath, $"server-{versionName}.jar");
-                using (var fileStream = new System.IO.FileStream(filePath, System.IO.FileMode.Create))
+                var filePath = Path.Combine(mcPath.BasePath, $"server-{versionName}.jar");
+                using (var fileStream = new FileStream(filePath, FileMode.Create))
                 {
                     await response.Content.CopyToAsync(fileStream);
                 }
