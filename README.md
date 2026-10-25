@@ -9,7 +9,6 @@ HaOir 是一个基于 WPF (.NET 8) 和 CmlLib.Core 的 Minecraft 启动器，支
 - .NET 8.0 SDK（Windows）
 - CmlLib.Core 4.1.0
 - CmlLib.Core.Auth.Microsoft 3.4.0
-- CmlLib.Core.Installer.Java
 
 ## 编译指南
 
