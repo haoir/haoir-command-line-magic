@@ -91,7 +91,7 @@ namespace HaOir
                 VersionList.Items.Clear();
                 foreach (var version in vanillaVersions)
                 {
-                    VersionList.Items.Add(new System.Windows.Controls.ListBoxItem { Content = version.VersionName });
+                    VersionList.Items.Add(new System.Windows.Controls.ListBoxItem { Content = version.Version });
                 }
             }
             catch (Exception ex)
